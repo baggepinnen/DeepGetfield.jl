@@ -102,7 +102,7 @@ function denest_rec(x)
     x
 end
 
-function _denest(x)
+function denest(x)
     dims = calcdims(x)
     x = denest_rec(x)
     x = reshape(x, getindex.(dims, 1)...)
