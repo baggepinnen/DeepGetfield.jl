@@ -14,6 +14,9 @@ This package provides the function `f = getter(data::CompositeType, fieldname::S
 ## Motivation
 I frequently run many experiments in parallel using `pmap` etc. and results may be a custom type stored in a custom type, tuple, array etc.. To analyze the results I need to access a particular field deep inside the result structure and figuring out how to find it is often a hassle. This package does the searching for you and returns a function which gets the requested field.
 
+## Installation
+`Pkg.clone("https://github.com/baggepinnen/FieldGetter.jl")`
+
 
 # Example
 Define some types for testing
@@ -38,22 +41,36 @@ end
 ```julia
 julia> a   = A(2, 1., B(10.,[C(1),C(2)])) # Create complex composite type
 
-julia> getterfun = getter(a, :yy)
+julia> dump(a) # Vizualize the structure and contents of a
+A
+  x: Int64 2
+  y: Float64 1.0
+  z: B
+    xx: Float64 10.0
+    yy: Array{C}((2,))
+      1: C
+        zz: Int64 1
+      2: C
+        zz: Int64 2
 
-julia> getterfun(a)
+julia> getterfun = getter(a, :yy) # This function acts as deep_getfield(a,:yy)
+
+julia> getterfun(a) # Get field yy, equivalent to a.z.yy
 2-element Array{C,1}:
  C(1)
  C(2)
 
-julia> getterfun = getter(a, :zz)
+julia> getterfun = getter(a, :zz) # Getter for field zz, equivalent to getfield.(a.z.yy, :zz)
 
-julia> getterfun(a) == [1,2] == a.z.yy |> x -> getfield.(x,:zz)
+julia> getterfun(a) == [1,2] == getfield.(a.z.yy, :zz)
 true
 ```
 
+Notice how in the first case, we got a `Vector{C}` whereas in the second case we got a `Vector{Int}`.
+
 If one were to manually write the function to extract field `zz` from `a`, it would look something like this
 ```julia
-get_zz(a) = a.z.yy |> x -> getfield.(x,:zz)
+getfield.(a.z.yy, :zz)
 ```
 With this package one can get the same function through
 ```julia
