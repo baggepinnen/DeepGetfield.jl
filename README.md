@@ -82,7 +82,32 @@ get_zz = getter(a, :zz)
 Searches through the structure `data` for a field with name `fieldname`. Arrays are broadcasted over, but the search only looks at the first element.
 - `denest(x::Array{Array...})` flattens the structure of `x` from an array of arrays to a tensor. Can handle deep nestings.
 
+## Internals
+```julia
+ops   = _getter(a, :zz)  # Get a vector of operations
+ops_b = _getter(ops)     # Modify operations to handle broadcasting over arrays
+zz    = follow(a, ops_b) # Apply all the operations
+```
+With output:
+```julia
+julia> ops   = _getter(a, :zz)  # Get a vector of operations
+4-element Array{Expr,1}:
+ :(x -> getfield(x, :z))
+ :(x -> getfield(x, :yy))
+ :(x -> getindex(x, 1))
+ :(x -> getfield(x, :zz))
 
+julia> ops_b = _getter(ops)     # Modify operations to handle broadcasting over arrays
+3-element Array{Expr,1}:
+ :(x -> getfield(x, :z))
+ :(x -> getfield(x, :yy))
+ :(x -> getfield.(x, :zz))
+
+julia> zz    = follow(a, ops_b) # Apply all the operations
+2-element Array{Int64,1}:
+ 1
+ 2
+```
 # Limitations
 - If several fields deep inside the structure have the same name, the first field found (depth first) is returned and others ignored.
 - Arrays are looked through, but it is assumed that all elements in the array have the same field names. Only the first element is looked at during search.
