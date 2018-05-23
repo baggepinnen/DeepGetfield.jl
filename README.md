@@ -12,7 +12,7 @@ This package provides the macro `f = @deepf data.field` where `data::CompositeTy
 `data` might be a complex composite type with fields which are themselves composite types or arrays. `@deepf` searches the structure `data` depth first for the first occurrence of a field with name `field` and returns a function that gets that field. An illustration is provided below, where `data` is a complicated type, and the user wants a function that returns the field `zz` deep inside `data`. If you want the data immediately instead of a getter function, use the macro `@deep data.field`.
 
 ## Motivation
-I frequently run many experiments in parallel using `pmap` etc. and results may be a custom type stored in a custom type, tuple, array etc.. To analyze the results I need to access a particular field deep inside the result structure and figuring out how to find it is often a hassle. This package does the searching for you and returns a function which gets the requested field.
+I frequently run many experiments in parallel using `pmap` etc. and results may be a custom type stored in a custom type, tuple, array etc.. To analyze the results I need to access a particular field deep inside the result structure and figuring out how to find it is often a hassle. This package does the searching for you and returns a function which gets the requested field (or the field directly).
 
 ## Installation
 `Pkg.clone("https://github.com/baggepinnen/DeepGetfield.jl")`
@@ -83,9 +83,10 @@ get_zz = @deepf a.zz
 ```
 
 # Functions
-- `@deepf data.field` Returns a function `data -> $field` where `field` is somewhere deep inside `data`
-Searches through the structure `data` for a field with name `fieldname`. Arrays are broadcasted over, but the search only looks at the first element.
-- `getter(d::CompositeType, fieldname::Symbol, [max_depth = 58])::Function d-> $fieldname` Function interface to `@deepf`
+- `@deepf data.field` Searches through the structure `data` and returns a function `data -> $field` where `field` is somewhere deep inside `data`.
+Arrays are broadcasted over, but the search only looks at the first element.
+- `@deep` Equivalent to `@deepf(data.field)(data)`, i.e., return the field immediately instead of a getter function.
+- `getter(d::CompositeType, fieldname::Symbol, [max_depth = 8])::Function d-> $fieldname` Function interface to `@deepf`
 - `denest(x::Array{Array...})` flattens the structure of `x` from an array of arrays to a tensor. Can handle deep nestings.
 
 ## Internals
@@ -94,6 +95,8 @@ ops   = _getter(a, :zz)  # Get a vector of operations
 ops_b = _getter(ops)     # Modify operations to handle broadcasting over arrays
 zz    = follow(a, ops_b) # Apply all the operations
 ```
+`@deep` is essentially composed of the above three function calls.
+
 With output:
 ```julia
 julia> ops   = _getter(a, :zz)  # Get a vector of operations
@@ -115,6 +118,6 @@ julia> zz    = follow(a, ops_b) # Apply all the operations
  2
 ```
 # Limitations
-- If several fields deep inside the structure have the same name, the first field found (depth first) is returned and others ignored.
-- Arrays are looked through, but it is assumed that all elements in the array have the same field names. Only the first element is looked at during search.
+- If several fields inside the structure have the same name, the first field found (depth first) is returned and others ignored.
+- Arrays are looked through, but it is assumed that all elements in the array have the same field names. Only the first element is looked at during search. If the field is found inside an `{Array / Array{Arrays}}`, then the result will have that same structure. Use `denest` to flatten.
 - Tests are so far limited and bugs are expected.
