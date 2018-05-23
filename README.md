@@ -1,21 +1,21 @@
-# FieldGetter
+# DeepGetfield
 
-[![Build Status](https://travis-ci.org/baggepinnen/FieldGetter.jl.svg?branch=master)](https://travis-ci.org/baggepinnen/FieldGetter.jl)
+[![Build Status](https://travis-ci.org/baggepinnen/DeepGetfield.jl.svg?branch=master)](https://travis-ci.org/baggepinnen/DeepGetfield.jl)
 
-[![Coverage Status](https://coveralls.io/repos/baggepinnen/FieldGetter.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/baggepinnen/FieldGetter.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/baggepinnen/DeepGetfield.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/baggepinnen/DeepGetfield.jl?branch=master)
 
-[![codecov.io](http://codecov.io/github/baggepinnen/FieldGetter.jl/coverage.svg?branch=master)](http://codecov.io/github/baggepinnen/FieldGetter.jl?branch=master)
+[![codecov.io](http://codecov.io/github/baggepinnen/DeepGetfield.jl/coverage.svg?branch=master)](http://codecov.io/github/baggepinnen/DeepGetfield.jl?branch=master)
 
 
-This package provides the function `f = getter(data::CompositeType, fieldname::Symbol)` which returns a function that acts as a deep version of getfield: `f(data) -> deep_getfield(data, fieldname)`.
+This package provides the macro `f = @deepf data.field` where `data::CompositeType, field::Symbol`. `f` is a function that acts as a deep version of getfield: `f(data) -> deep_getfield(data, fieldname)`.
 
-`data` might be a complex composite type with fields which are themselves composite types or arrays. `getter` searches the structure `data` depth first for the first occurrence of a field with name `fieldname` and returns a function that gets that field. An illustration is provided below, where `a` is a complicated type, and the user wants a function that returns the field `zz` deep inside `a`.
+`data` might be a complex composite type with fields which are themselves composite types or arrays. `@deepf` searches the structure `data` depth first for the first occurrence of a field with name `field` and returns a function that gets that field. An illustration is provided below, where `data` is a complicated type, and the user wants a function that returns the field `zz` deep inside `data`. If you want the data immediately instead of a getter function, use the macro `@deep data.field`.
 
 ## Motivation
 I frequently run many experiments in parallel using `pmap` etc. and results may be a custom type stored in a custom type, tuple, array etc.. To analyze the results I need to access a particular field deep inside the result structure and figuring out how to find it is often a hassle. This package does the searching for you and returns a function which gets the requested field.
 
 ## Installation
-`Pkg.clone("https://github.com/baggepinnen/FieldGetter.jl")`
+`Pkg.clone("https://github.com/baggepinnen/DeepGetfield.jl")`
 
 
 # Example
@@ -53,14 +53,19 @@ A
       2: C
         zz: Int64 2
 
-julia> getterfun = getter(a, :yy) # This function acts as deep_getfield(a,:yy)
+julia> getterfun = @deepf a.yy # This function acts as deep_getfield(a,:yy)
 
 julia> getterfun(a) # Get field yy, equivalent to a.z.yy
 2-element Array{C,1}:
  C(1)
  C(2)
 
-julia> getterfun = getter(a, :zz) # Getter for field zz, equivalent to getfield.(a.z.yy, :zz)
+julia>  @deep a.yy # Evaluate immediately without getting a function
+2-element Array{C,1}:
+ C(1)
+ C(2)
+
+julia> getterfun = @deepf a.zz # Getter for field zz, equivalent to getfield.(a.z.yy, :zz)
 
 julia> getterfun(a) == [1,2] == getfield.(a.z.yy, :zz)
 true
@@ -74,12 +79,13 @@ getfield.(a.z.yy, :zz)
 ```
 With this package one can get the same function through
 ```julia
-get_zz = getter(a, :zz)
+get_zz = @deepf a.zz
 ```
 
 # Functions
-- `getter(d::CompositeType, fieldname::Symbol, [max_depth = 5])::Function d-> $fieldname`
+- `@deepf data.field` Returns a function `data -> $field` where `field` is somewhere deep inside `data`
 Searches through the structure `data` for a field with name `fieldname`. Arrays are broadcasted over, but the search only looks at the first element.
+- `getter(d::CompositeType, fieldname::Symbol, [max_depth = 58])::Function d-> $fieldname` Function interface to `@deepf`
 - `denest(x::Array{Array...})` flattens the structure of `x` from an array of arrays to a tensor. Can handle deep nestings.
 
 ## Internals

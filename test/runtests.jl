@@ -1,4 +1,4 @@
-using FieldGetter
+using DeepGetfield
 @static if VERSION < v"0.7.0-DEV.2005"
     using Base.Test
 else
@@ -25,11 +25,14 @@ fun = getter(a, :yy)
 @test fun(a) isa Vector{C}
 @test getter(a, :zz)(a) == [1,2] == a.z.yy |> x -> getfield.(x,:zz)
 
+@deep(a.yy) == fun(a)
+@deep(a.zz) == [1,2]
+
 
 
 ops = [:(x-> getindex(x,1))]
 b = [1,2]
-@test follow(b,ops) == 1
+@test DeepGetfield.follow(b,ops) == 1
 
 f = eval(ops[1])
 @test Base.invokelatest(f,b) == 1

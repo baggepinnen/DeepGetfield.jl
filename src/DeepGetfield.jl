@@ -1,10 +1,10 @@
-module FieldGetter
+module DeepGetfield
 
-export getter, denest
+export getter, denest, @deep, @deepf
 
 using MacroTools
 
-function _getter(data, field, maxdepth=5)
+function _getter(data, field, maxdepth=8)
     operations = Expr[]
     _getter(data,field, maxdepth, operations)
 end
@@ -13,6 +13,12 @@ function follow(data,operations::Vector{Expr})
     isempty(operations) && (return data)
     f = eval(operations[1])
     return follow(Base.invokelatest(f,data), operations[2:end])
+end
+
+function follow(data,operations::Vector{<:Function})
+    isempty(operations) && (return data)
+    f = operations[1]
+    return follow(f(data), operations[2:end])
 end
 
 function _getter(data, field, maxdepth, operations::Vector{Expr})
@@ -67,7 +73,7 @@ function _getter(operations)
                     end
                 end
             end
-            operations[i] = ex # TODO: does not handle more than two getindex
+            operations[i] = ex
         elseif broadcasts >= 1 # getfield
             field = QuoteNode(arg.value)
             if broadcasts == 1
@@ -85,11 +91,19 @@ function _getter(operations)
     operations
 end
 
+function op2fun(ops)
+    f = eval(ops)
+    x -> Base.invokelatest(f,x)
+end
+
 function getter(args...; denest=false)
+    # TODO: preevaluate expressions
+    ops = _getter(_getter(args...))
+    ops = op2fun.(ops)
     if denest
-        z->_denest(follow(z, _getter(_getter(args...))))
+        z->_denest(follow(z, ops))
     else
-        z->follow(z, _getter(_getter(args...)))
+        z->follow(z, ops)
     end
 end
 
@@ -112,6 +126,21 @@ end
 calcdims(x) = calcdims(x[1],[length(x)])
 calcdims(x, dims) = dims
 calcdims(x::AbstractArray, dims) = calcdims(x[1], push!(dims, length(x)))
+
+
+macro deep(ex)
+    @capture(ex, data_.field_) || error("Expected an expression on the form data.field")
+    quote
+        getter($(esc(data)), $(QuoteNode(field)))($(esc(data)))
+    end
+end
+
+macro deepf(ex)
+    @capture(ex, data_.field_) || error("Expected an expression on the form data.field")
+    quote
+        getter($(esc(data)), $(QuoteNode(field)))
+    end
+end
 
 
 end # module
