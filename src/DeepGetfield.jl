@@ -21,17 +21,28 @@ function follow(data,operations::Vector{<:Function})
 end
 
 """
-Evaluates the expression and returns a Function. Uses `invokelatest`.
+Evaluates the expressions and returns a Function.
 """
-function op2fun(ops)
-    f = eval(ops)
-    x -> Base.invokelatest(f,x)
+function ops2fun(ops)
+    if @capture(ops[1], x->g_(x, s_))
+        ex = :(x-> $g(x, $s))
+    elseif @capture(ops[1], x->g_.(x, s_))
+        ex = :(x-> $(g).(x, $s))
+    end
+    for i = 2:length(ops)
+        if @capture(ops[i], x->g_(x, s_))
+            ex = :( x->$g($ex(x), $s) )
+        elseif @capture(ops[i], x->g_.(x, s_))
+            ex = :( x->$g.($ex(x), $s) )
+        end
+    end
+    f = eval(ex)
 end
 
 """
     operations::Vector{Expr} = findfield(data, field, maxdepth=8)
-Recursively (depth first) searches through the composite type `data` in search for `field`
-Returns a vector of Function expressions that if followed, leads to the field.
+Recursively (depth first) searches through the composite Type `data` in search For `field`
+Returns a vector of Function expressions that If followed, leads to the field.
 The result should be postprocessed by `tobroadcast`.
 """
 function findfield(data, field, maxdepth=8)
@@ -64,8 +75,8 @@ function findfield(data, field, maxdepth, operations::Vector{Expr})
 end
 
 """
-    ops::Vector{Expr} tobroadcast(operations::Vector{Expr})
-Searches for `getindex` operations, removes them and broadcasts subsequent operations.
+    ops::Vector{Expr} = tobroadcast(operations::Vector{Expr})
+Searches For `getindex` operations, removes them and broadcasts subsequent operations.
 """
 function tobroadcast(operations)
     operations = copy(operations)
@@ -114,20 +125,6 @@ function tobroadcast(operations)
 end
 
 
-"""
-    getter(data, field, maxdepth=8; denest=false)
-Function version of `@deepf`. Allows specification of maximum search depth and whether or not do `denest` the result. See also `denest`, `@deepf`.
-"""
-function getter(args...; denest=false)
-    # TODO: preevaluate expressions
-    ops = tobroadcast(findfield(args...))
-    ops = op2fun.(ops)
-    if denest
-        z->_denest(follow(z, ops))
-    else
-        z->follow(z, ops)
-    end
-end
 
 """
     denest(x::Array{Array...})
@@ -172,12 +169,12 @@ Arrays are broadcasted over, but the search only looks at the first element.
 macro deep(ex)
     @capture(ex, data_.field_) || error("Expected an expression on the form data.field")
     quote
-        getter($(esc(data)), $(QuoteNode(field)))($(esc(data)))
+        Base.invokelatest(getter($(esc(data)), $(QuoteNode(field))), $(esc(data)))
     end
 end
 
 """
-    @deepf
+    @deepf data.field
 Deep getfield
 
 Searches through the structure `data` and returns a function `data -> field` where `field` is somewhere deep inside `data`.
@@ -191,4 +188,40 @@ macro deepf(ex)
 end
 
 
+struct DeepGetter{F}
+    f::F
+    path::Vector{Symbol}
+    operandtype::DataType
 end # module
+
+Base.show(io::IO, z::DeepGetter) = print(io, "Getter: ", path...)
+function Base.show(io::IO, ::MIME"text/plain", g::DeepGetter)
+    print(io, "DeepGetter($(g.path[end]))\nPath: ")
+    for s in g.path
+        print(io, s, " ")
+    end
+    print(io, "\nOperates on Type $(g.operandtype)\n")
+end
+
+(g::DeepGetter)(x) = g.f(x)
+
+"""
+    getter(data, field, maxdepth=8)
+Function version of `@deepf`. Allows specification of maximum search depth. See also `denest`, `@deepf`.
+"""
+function getter(data, args...)
+    # TODO: preevaluate expressions
+    ops = findfield(data, args...)
+    path = fieldsym.(ops)
+    path = [s isa Symbol ? s : :broadcast for s ∈ path]
+    ops_b = tobroadcast(ops)
+    f = ops2fun(ops_b)
+    DeepGetter(f, path, typeof(data))
+end
+
+function fieldsym(op)
+    last = op.args[2].args[2].args[3]
+    return last isa QuoteNode ? last.value : last
+end
+
+end

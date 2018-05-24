@@ -45,7 +45,8 @@ ops_b = DeepGetfield.tobroadcast(ops)
 @test @capture(ops_b[2], x->getfield(x, arg_))
 @test @capture(ops_b[3], x->getfield.(x, arg_))
 
-@test getter(a, :zz)(a) == [1,2] == a.z.yy |> x -> getfield.(x,:zz)
+fun2 = getter(a, :zz)
+@test fun2(a) == [1,2] == a.z.yy |> x -> getfield.(x,:zz)
 
 @deep(a.yy) == fun(a)
 @deep(a.zz) == [1,2]
