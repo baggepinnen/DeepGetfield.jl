@@ -132,3 +132,4 @@ julia> zz    = follow(a, ops_b)  # Apply all the operations
 - Tuples are not tested.
 - Tests are so far limited and bugs are expected.
 - `denest` flattens matrices and higher order tensors to one dimension.
+- `Dicts` are not recognized as containers and the dict entries are not explored.

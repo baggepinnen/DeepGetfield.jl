@@ -46,7 +46,7 @@ function findfield(data, field, maxdepth, operations::Vector{Expr})
     dt = typeof(follow(data, operations))
     if dt <: AbstractArray || dt <: Tuple
         push!(operations, :(x-> getindex(x,1)))
-        found = findfield(data,field, maxdepth, operations)
+        found = findfield(data, field, maxdepth, operations)
         found != nothing && (return operations)
     else
         names = fieldnames(dt)
@@ -180,7 +180,7 @@ end
     @deepf
 Deep getfield
 
-Searches through the structure `data` and returns a function `data -> $field` where `field` is somewhere deep inside `data`.
+Searches through the structure `data` and returns a function `data -> field` where `field` is somewhere deep inside `data`.
 Arrays are broadcasted over, but the search only looks at the first element.
 """
 macro deepf(ex)
