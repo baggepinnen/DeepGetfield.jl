@@ -88,31 +88,39 @@ Arrays are broadcasted over, but the search only looks at the first element.
 - `@deep` Equivalent to `@deepf(data.field)(data)`, i.e., return the field immediately instead of a getter function.
 - `getter(d::CompositeType, fieldname::Symbol, [max_depth = 8])::Function d-> $fieldname` Function interface to `@deepf`
 - `denest(x::Array{Array...})` flattens the structure of `x` from an array of arrays to a tensor. Can handle deep nestings.
+```julia
+x = [1, 2]
+y = [x, x, x]
+z = [y, y, y, y]
+denest(x) == x
+denest(y) == [x x x]
+denest(z) == cat(3, denest(y), denest(y), denest(y), denest(y))
+```
 
 ## Internals
 ```julia
-ops   = _getter(a, :zz)  # Get a vector of operations
-ops_b = _getter(ops)     # Modify operations to handle broadcasting over arrays
-zz    = follow(a, ops_b) # Apply all the operations
+ops   = findfield(a, :zz) # Get a vector of operations
+ops_b = tobroadcast(ops)  # Modify operations to handle broadcasting over arrays
+zz    = follow(a, ops_b)  # Apply all the operations
 ```
 `@deep` is essentially composed of the above three function calls.
 
 With output:
 ```julia
-julia> ops   = _getter(a, :zz)  # Get a vector of operations
+julia> ops   = findfield(a, :zz) # Get a vector of operations
 4-element Array{Expr,1}:
  :(x -> getfield(x, :z))
  :(x -> getfield(x, :yy))
  :(x -> getindex(x, 1))
  :(x -> getfield(x, :zz))
 
-julia> ops_b = _getter(ops)     # Modify operations to handle broadcasting over arrays
+julia> ops_b = tobroadcast(ops)  # Modify operations to handle broadcasting over arrays
 3-element Array{Expr,1}:
  :(x -> getfield(x, :z))
  :(x -> getfield(x, :yy))
  :(x -> getfield.(x, :zz))
 
-julia> zz    = follow(a, ops_b) # Apply all the operations
+julia> zz    = follow(a, ops_b)  # Apply all the operations
 2-element Array{Int64,1}:
  1
  2
@@ -120,4 +128,7 @@ julia> zz    = follow(a, ops_b) # Apply all the operations
 # Limitations
 - If several fields inside the structure have the same name, the first field found (depth first) is returned and others ignored.
 - Arrays are looked through, but it is assumed that all elements in the array have the same field names. Only the first element is looked at during search. If the field is found inside an `{Array / Array{Arrays}}`, then the result will have that same structure. Use `denest` to flatten.
+- Currently only two consequtive array lookups are supported, i.e., there might be issues if search has to search through `Vector{Vector{Vector}}}`.
+- Tuples are not tested.
 - Tests are so far limited and bugs are expected.
+- `denest` flattens matrices and higher order tensors to one dimension.
